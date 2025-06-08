@@ -1,27 +1,27 @@
 [tool.poetry]
-name = "google-cloud-function-gen2-template"
+name = "alertmanager-to-notion"
 version = "1.0.0"
-description = "Template for Python functions to run on Google Cloud Functions Platform (gen2), with CI\\CD by GitHub Actions"
-authors = ["Sergey Yarlov <gdazeysinc@gmail.com>"]
+description = "Webhook handler for Prometheus Alertmanager to create a new record in the Notion Incidents Database and update resolved ones."
+authors = ["Sergei Iarlov <gdazeysinc@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fireo = "^2.2.2"
 google-cloud-logging = "^3.11.2"
 python-decouple = "^3.8"
-tenacity = "^9.0.0"
 pytz = "^2024.2"
-python-settings = "^0.2.2"
+python-settings = "0.2.3"
 functions-framework = "^3.8.1"
 google-cloud-pubsub = "^2.26.1"
 dump-env = "^1.5.0"
+codecov-cli = "11.0.3"
+pydantic = "^2.11.5"
+requests = "^2.32.3"
 
 
 [tool.poetry.group.dev.dependencies]
-freezegun = "^1.5.1"
 pre-commit = "^3.8.0"
 pytest = "^8.3.2"
 mypy = "^1.11.2"
@@ -49,7 +49,6 @@ pytest-deadfixtures = "^2.2.1"
 types-requests = "^2.32.0.20240914"
 types-pytz = "^2024.2.0.20241003"
 dump-env = "^1.5.0"
-codecov-cli = "^9.0.4"
 
 
 [build-system]
@@ -88,7 +87,7 @@ py_version = 312
 known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
 sections = ["FUTURE", "TYPING", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "MAIN", "LOCALFOLDER"]
 default_section = "FIRSTPARTY"
-known_main = ["server", "tests"]
+known_main = ["app", "tests"]
 skip = ["__init__.py"]
 include_trailing_comma = true
 profile = "black"

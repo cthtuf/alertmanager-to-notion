@@ -12,23 +12,6 @@ resource "null_resource" "wait_for_one_minute" {
   }
 }
 
-# APIs
-resource "google_project_service" "firebase_api" {
-  project = var.project_id
-  service = "firebase.googleapis.com"
-  timeouts {
-    create = "5m"
-  }
-}
-
-resource "google_project_service" "firestore_api" {
-  project = var.project_id
-  service = "firestore.googleapis.com"
-  timeouts {
-    create = "5m"
-  }
-}
-
 resource "google_project_service" "cloudrun_api" {
   project = var.project_id
   service = "run.googleapis.com"
@@ -64,14 +47,6 @@ resource "google_project_service" "cloud_build_api" {
 resource "google_project_service" "artifact_registry_api" {
   project = var.project_id
   service = "artifactregistry.googleapis.com"
-  timeouts {
-    create = "5m"
-  }
-}
-
-resource "google_project_service" "cloud_scheduler_api" {
-  project = var.project_id
-  service = "cloudscheduler.googleapis.com"
   timeouts {
     create = "5m"
   }
@@ -163,12 +138,10 @@ resource "local_file" "gha_sa_key_json" {
   content  = base64decode(google_service_account_key.gha_sa_key.private_key)
 }
 
-resource "google_service_account" "check_site_update_function_sa" {
-  account_id   = "check-site-update-function"
-  display_name = "Service Account for CheckSiteUpdates"
+resource "google_service_account" "alertmanager_to_notion_function_sa" {
+  account_id   = "alert-manager-to-notion"
+  display_name = "Service Account for AlertManager to Notion Function"
   depends_on = [
-    google_project_service.firebase_api,
-    google_project_service.firestore_api,
     google_project_service.cloudrun_api,
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,
@@ -178,7 +151,7 @@ resource "google_service_account" "check_site_update_function_sa" {
 # Roles for the functions service account
 resource "google_project_iam_member" "function_sa_roles" {
   project = var.project_id
-  member  = "serviceAccount:${google_service_account.check_site_update_function_sa.email}"
+  member  = "serviceAccount:${google_service_account.alertmanager_to_notion_function_sa.email}"
   for_each = toset([
     "roles/firebase.admin",
     "roles/cloudfunctions.developer",
@@ -192,66 +165,11 @@ resource "google_project_iam_member" "function_sa_roles" {
   role = each.value
 }
 
-resource "google_firestore_database" "default" {
-  name            = "(default)"
-  project         = var.project_id
-  location_id     = var.region
-  type            = "FIRESTORE_NATIVE"
-  deletion_policy = "DELETE"
-  depends_on = [
-    google_project_service.firestore_api,
-  ]
-}
-
-# Firestore Index
-resource "google_firestore_index" "website_content_index" {
-  project       = var.project_id
-  collection    = "website_content"  # This is a model in app/models.py
-  query_scope   = "COLLECTION"
-
-  fields {
-    field_path = "url"
-    order      = "ASCENDING"
-  }
-
-  fields {
-    field_path = "timestamp"
-    order      = "DESCENDING"
-  }
-
-  fields {
-    field_path = "__name__"
-    order      = "DESCENDING"
-  }
-
-  depends_on = [
-    google_firestore_database.default,
-  ]
-}
-
 resource "google_pubsub_topic" "events_topic" {
   name = var.events_pubsub_topic
 
   depends_on = [
     google_project_service.pubsub_api,
-  ]
-}
-
-# Google Cloud Scheduler Job
-resource "google_cloud_scheduler_job" "hourly_job" {
-  name      = "hourly-check-job"
-  schedule  = "0 * * * *" # Каждый час
-  time_zone = "UTC"
-
-  pubsub_target {
-    topic_name = google_pubsub_topic.events_topic.id
-    data       = base64encode("Hourly trigger for website check")  # Specify payload if you need
-  }
-
-  depends_on = [
-    google_project_service.cloud_scheduler_api,
-    google_project_service.pubsub_api,
-    google_pubsub_topic.events_topic,
   ]
 }
 
@@ -265,8 +183,8 @@ resource "null_resource" "generate_requirements" {
   }
 }
 
-resource "google_cloudfunctions2_function" "check_website_events" {
-  name     = "check-website-function-events"
+resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
+  name     = "alertmanager-to-notion-handler"
   location = var.region
 
   build_config {
@@ -278,101 +196,53 @@ resource "google_cloudfunctions2_function" "check_website_events" {
     }
     source {
       storage_source {
-        bucket = google_storage_bucket.csu_bucket.name
-        object = google_storage_bucket_object.csu_archive.name
+        bucket = google_storage_bucket.am2n_bucket.name
+        object = google_storage_bucket_object.am2n_archive.name
       }
     }
   }
 
   service_config {
-    available_memory   = "256M"
-    service_account_email = google_service_account.check_site_update_function_sa.email
+    available_memory      = "256M"
+    service_account_email = google_service_account.alertmanager_to_notion_function_sa.email
     environment_variables = {
-        GCP_PROJECT_ID = var.project_id
-        SETTINGS_MODULE = "app.settings"
+      GCP_PROJECT_ID  = var.project_id
+      SETTINGS_MODULE = "app.settings"
     }
     ingress_settings = "ALLOW_INTERNAL_ONLY"
 
     secret_environment_variables {
-      key    = "EVENTS_PUBSUB_TOPIC"
-      secret = google_secret_manager_secret.events_pubsub_topic.secret_id
-      version = "latest"
+      key        = "EVENTS_PUBSUB_TOPIC"
+      secret     = google_secret_manager_secret.events_pubsub_topic.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_HTTP_HEADER_NAME"
-      secret = google_secret_manager_secret.csfu_http_header_name.secret_id
-      version = "latest"
+      key        = "AM2N_NOTION_TOKEN"
+      secret     = google_secret_manager_secret.am2n_notion_token.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_HTTP_HEADER_VALUE"
-      secret = google_secret_manager_secret.csfu_http_header_value.secret_id
-      version = "latest"
+      key        = "AM2N_NOTION_DB_ID"
+      secret     = google_secret_manager_secret.am2n_notion_db_id.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_TARGETS"
-      secret = google_secret_manager_secret.csfu_targets.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-    secret_environment_variables {
-      key    = "CSFU_TARGET_TIMEOUT"
-      secret = google_secret_manager_secret.csfu_target_timeout.secret_id
-      version = "latest"
+      key        = "AM2N_HTTP_HEADER_NAME"
+      secret     = google_secret_manager_secret.am2n_http_header_name.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_WEBHOOK_URL"
-      secret = google_secret_manager_secret.csfu_webhook_url.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_HEADERS"
-      secret = google_secret_manager_secret.csfu_webhook_headers.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_RETRY_ATTEMPTS"
-      secret = google_secret_manager_secret.csfu_webhook_retry_attempts.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_RETRY_WAIT"
-      secret = google_secret_manager_secret.csfu_webhook_retry_wait.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_TIMEOUT"
-      secret = google_secret_manager_secret.csfu_webhook_timeout.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_SNAPSHOTS_KEEP_LAST_DAYS"
-      secret = google_secret_manager_secret.csfu_snapshots_keep_last_days.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_PROXY"
-      secret = google_secret_manager_secret.csfu_proxy.secret_id
-      version = "latest"
+      key        = "AM2N_HTTP_HEADER_VALUE"
+      secret     = google_secret_manager_secret.am2n_http_header_value.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
   }
@@ -391,23 +261,17 @@ resource "google_cloudfunctions2_function" "check_website_events" {
     google_project_service.eventarc_api,
     google_project_service.artifact_registry_api,
     google_project_service.secret_manager_api,
-    google_secret_manager_secret.csfu_http_header_name,
-    google_secret_manager_secret.csfu_http_header_value,
-    google_secret_manager_secret.csfu_targets,
-    google_secret_manager_secret.csfu_webhook_url,
-    google_secret_manager_secret.csfu_proxy,
+    google_secret_manager_secret.am2n_notion_token,
+    google_secret_manager_secret.am2n_notion_db_id,
+    google_secret_manager_secret.am2n_http_header_name,
+    google_secret_manager_secret.am2n_http_header_value,
     google_secret_manager_secret.events_pubsub_topic,
-    google_secret_manager_secret.csfu_webhook_retry_attempts,
-    google_secret_manager_secret.csfu_webhook_retry_wait,
-    google_secret_manager_secret.csfu_webhook_timeout,
-    google_secret_manager_secret.db_timezone,
-    google_secret_manager_secret.csfu_snapshots_keep_last_days,
     null_resource.wait_for_one_minute,
   ]
 }
 
-resource "google_cloudfunctions2_function" "check_website_http" {
-  name     = "check-website-function-http"
+resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
+  name     = "alertmanager-to-notion-webhook"
   location = var.region
 
   build_config {
@@ -419,15 +283,15 @@ resource "google_cloudfunctions2_function" "check_website_http" {
     }
     source {
       storage_source {
-        bucket = google_storage_bucket.csu_bucket.name
-        object = google_storage_bucket_object.csu_archive.name
+        bucket = google_storage_bucket.am2n_bucket.name
+        object = google_storage_bucket_object.am2n_archive.name
       }
     }
   }
 
   service_config {
     available_memory      = "256M"
-    service_account_email = google_service_account.check_site_update_function_sa.email
+    service_account_email = google_service_account.alertmanager_to_notion_function_sa.email
     ingress_settings      = "ALLOW_ALL" # Доступ открыт для всех, можно ограничить
     environment_variables = {
       GCP_PROJECT_ID   = var.project_id
@@ -442,77 +306,29 @@ resource "google_cloudfunctions2_function" "check_website_http" {
     }
 
     secret_environment_variables {
-      key    = "CSFU_HTTP_HEADER_NAME"
-      secret = google_secret_manager_secret.csfu_http_header_name.secret_id
+      key    = "AM2N_NOTION_TOKEN"
+      secret = google_secret_manager_secret.am2n_notion_token.secret_id
       version = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_HTTP_HEADER_VALUE"
-      secret = google_secret_manager_secret.csfu_http_header_value.secret_id
+      key    = "AM2N_NOTION_DB_ID"
+      secret = google_secret_manager_secret.am2n_notion_db_id.secret_id
       version = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_TARGETS"
-      secret = google_secret_manager_secret.csfu_targets.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-    secret_environment_variables {
-      key    = "CSFU_TARGET_TIMEOUT"
-      secret = google_secret_manager_secret.csfu_target_timeout.secret_id
+      key    = "AM2N_HTTP_HEADER_NAME"
+      secret = google_secret_manager_secret.am2n_http_header_name.secret_id
       version = "latest"
       project_id = var.project_id
     }
 
     secret_environment_variables {
-      key    = "CSFU_WEBHOOK_URL"
-      secret = google_secret_manager_secret.csfu_webhook_url.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_HEADERS"
-      secret = google_secret_manager_secret.csfu_webhook_headers.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_RETRY_ATTEMPTS"
-      secret = google_secret_manager_secret.csfu_webhook_retry_attempts.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_RETRY_WAIT"
-      secret = google_secret_manager_secret.csfu_webhook_retry_wait.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_WEBHOOK_TIMEOUT"
-      secret = google_secret_manager_secret.csfu_webhook_timeout.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_SNAPSHOTS_KEEP_LAST_DAYS"
-      secret = google_secret_manager_secret.csfu_snapshots_keep_last_days.secret_id
-      version = "latest"
-      project_id = var.project_id
-    }
-
-    secret_environment_variables {
-      key    = "CSFU_PROXY"
-      secret = google_secret_manager_secret.csfu_proxy.secret_id
+      key    = "AM2N_HTTP_HEADER_VALUE"
+      secret = google_secret_manager_secret.am2n_http_header_value.secret_id
       version = "latest"
       project_id = var.project_id
     }
@@ -524,25 +340,19 @@ resource "google_cloudfunctions2_function" "check_website_http" {
     google_project_service.cloud_build_api,
     google_project_service.artifact_registry_api,
     google_project_service.secret_manager_api,
-    google_secret_manager_secret.csfu_http_header_name,
-    google_secret_manager_secret.csfu_http_header_value,
-    google_secret_manager_secret.csfu_targets,
-    google_secret_manager_secret.csfu_webhook_url,
-    google_secret_manager_secret.csfu_proxy,
+    google_secret_manager_secret.am2n_http_header_name,
+    google_secret_manager_secret.am2n_http_header_value,
+    google_secret_manager_secret.am2n_notion_token,
+    google_secret_manager_secret.am2n_notion_db_id,
     google_secret_manager_secret.events_pubsub_topic,
-    google_secret_manager_secret.csfu_webhook_retry_attempts,
-    google_secret_manager_secret.csfu_webhook_retry_wait,
-    google_secret_manager_secret.csfu_webhook_timeout,
-    google_secret_manager_secret.db_timezone,
-    google_secret_manager_secret.csfu_snapshots_keep_last_days,
     null_resource.wait_for_one_minute,
   ]
 }
 
-data "archive_file" "csu_sources_archive" {
+data "archive_file" "am2n_sources_archive" {
   type        = "zip"
   source_dir  = "${path.module}/../"
-  output_path = "${path.module}/csu_sources_archive.zip"
+  output_path = "${path.module}/am2n_sources_archive.zip"
 
   excludes = [
     ".git",
@@ -561,31 +371,31 @@ data "archive_file" "csu_sources_archive" {
   ]
 }
 
-resource "google_storage_bucket" "csu_bucket" {
-  name     = "csu_code_bucket-${var.project_id}"
+resource "google_storage_bucket" "am2n_bucket" {
+  name     = "am2n_code_bucket-${var.project_id}"
   location = var.region
 }
 
-resource "google_storage_bucket_object" "csu_archive" {
-  name         = "csu_check_website.zip"
-  bucket       = google_storage_bucket.csu_bucket.name
-  source       = data.archive_file.csu_sources_archive.output_path
+resource "google_storage_bucket_object" "am2n_archive" {
+  name         = "am2n.zip"
+  bucket       = google_storage_bucket.am2n_bucket.name
+  source       = data.archive_file.am2n_sources_archive.output_path
   content_type = "application/zip"
 }
 
 resource "google_cloud_run_service_iam_member" "function_invoker" {
-  service  = google_cloudfunctions2_function.check_website_http.name
+  service  = google_cloudfunctions2_function.alertmanager_to_notion_webhook.name
   location = var.region
   role     = "roles/run.invoker"
   member   = "allUsers"
   depends_on = [
-    google_cloudfunctions2_function.check_website_http,
+    google_cloudfunctions2_function.alertmanager_to_notion_webhook,
   ]
 }
 
 # Google Secret Manager Secrets
-resource "google_secret_manager_secret" "csfu_targets" {
-  secret_id = "CSFU_TARGETS"
+resource "google_secret_manager_secret" "am2n_http_header_name" {
+  secret_id = "AM2N_HTTP_HEADER_NAME"
   replication {
     user_managed {
       replicas {
@@ -598,17 +408,17 @@ resource "google_secret_manager_secret" "csfu_targets" {
     null_resource.wait_for_one_minute,
   ]
 }
-resource "google_secret_manager_secret_version" "target_url_version" {
-  secret      = google_secret_manager_secret.csfu_targets.id
-  secret_data = var.csfu_targets
+resource "google_secret_manager_secret_version" "am2n_http_header_name_version" {
+  secret      = google_secret_manager_secret.am2n_http_header_name.id
+  secret_data = var.am2n_http_header_name
   depends_on = [
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,
   ]
 }
 
-resource "google_secret_manager_secret" "csfu_target_timeout" {
-  secret_id = "CSFU_TARGET_TIMEOUT"
+resource "google_secret_manager_secret" "am2n_http_header_value" {
+  secret_id = "AM2N_HTTP_HEADER_VALUE"
   replication {
     user_managed {
       replicas {
@@ -621,17 +431,17 @@ resource "google_secret_manager_secret" "csfu_target_timeout" {
     null_resource.wait_for_one_minute,
   ]
 }
-resource "google_secret_manager_secret_version" "csfu_target_timeout_version" {
-  secret      = google_secret_manager_secret.csfu_target_timeout.id
-  secret_data = var.csfu_target_timeout
+resource "google_secret_manager_secret_version" "am2n_http_header_value_version" {
+  secret      = google_secret_manager_secret.am2n_http_header_value.id
+  secret_data = var.am2n_http_header_value
   depends_on = [
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,
   ]
 }
 
-resource "google_secret_manager_secret" "csfu_proxy" {
-  secret_id = "CSFU_PROXY"
+resource "google_secret_manager_secret" "am2n_notion_token" {
+  secret_id = "AM2N_NOTION_TOKEN"
   replication {
     user_managed {
       replicas {
@@ -644,17 +454,17 @@ resource "google_secret_manager_secret" "csfu_proxy" {
     null_resource.wait_for_one_minute,
   ]
 }
-resource "google_secret_manager_secret_version" "csfu_proxy_version" {
-  secret      = google_secret_manager_secret.csfu_proxy.id
-  secret_data = var.csfu_proxy
+resource "google_secret_manager_secret_version" "am2n_notion_token_version" {
+  secret      = google_secret_manager_secret.am2n_notion_token.id
+  secret_data = var.am2n_notion_token
   depends_on = [
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,
   ]
 }
 
-resource "google_secret_manager_secret" "csfu_http_header_name" {
-  secret_id = "CSFU_HTTP_HEADER_NAME"
+resource "google_secret_manager_secret" "am2n_notion_db_id" {
+  secret_id = "AM2N_NOTION_DB_ID"
   replication {
     user_managed {
       replicas {
@@ -667,193 +477,9 @@ resource "google_secret_manager_secret" "csfu_http_header_name" {
     null_resource.wait_for_one_minute,
   ]
 }
-resource "google_secret_manager_secret_version" "csfu_http_header_name_version" {
-  secret      = google_secret_manager_secret.csfu_http_header_name.id
-  secret_data = var.csfu_http_header_name
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_http_header_value" {
-  secret_id = "CSFU_HTTP_HEADER_VALUE"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_http_header_value_version" {
-  secret      = google_secret_manager_secret.csfu_http_header_value.id
-  secret_data = var.csfu_http_header_value
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_webhook_url" {
-  secret_id = "CSFU_WEBHOOK_URL"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "webhook_url_version" {
-  secret      = google_secret_manager_secret.csfu_webhook_url.id
-  secret_data = var.csfu_webhook_url
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_webhook_headers" {
-  secret_id = "CSFU_WEBHOOK_HEADERS"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_webhook_headers_version" {
-  secret      = google_secret_manager_secret.csfu_webhook_headers.id
-  secret_data = var.csfu_webhook_headers
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_webhook_retry_attempts" {
-  secret_id = "CSFU_WEBHOOK_RETRY_ATTEMPTS"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_webhook_retry_attempts_version" {
-  secret      = google_secret_manager_secret.csfu_webhook_retry_attempts.id
-  secret_data = var.csfu_webhook_retry_attempts
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_webhook_retry_wait" {
-  secret_id = "CSFU_WEBHOOK_RETRY_WAIT"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_webhook_retry_wait_version" {
-  secret      = google_secret_manager_secret.csfu_webhook_retry_wait.id
-  secret_data = var.csfu_webhook_retry_wait
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_webhook_timeout" {
-  secret_id = "CSFU_WEBHOOK_TIMEOUT"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_webhook_timeout_version" {
-  secret      = google_secret_manager_secret.csfu_webhook_timeout.id
-  secret_data = var.csfu_webhook_timeout
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "db_timezone" {
-  secret_id = "DB_TIMEZONE"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "db_timezone_version" {
-  secret      = google_secret_manager_secret.db_timezone.id
-  secret_data = var.db_timezone
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-
-resource "google_secret_manager_secret" "csfu_snapshots_keep_last_days" {
-  secret_id = "CSFU_SNAPSHOTS_KEEP_LAST_DAYS"
-  replication {
-    user_managed {
-      replicas {
-        location = var.region
-      }
-    }
-  }
-  depends_on = [
-    google_project_service.secret_manager_api,
-    null_resource.wait_for_one_minute,
-  ]
-}
-resource "google_secret_manager_secret_version" "csfu_snapshots_keep_last_days_version" {
-  secret      = google_secret_manager_secret.csfu_snapshots_keep_last_days.id
-  secret_data = var.csfu_snapshots_keep_last_days
+resource "google_secret_manager_secret_version" "am2n_notion_db_id_version" {
+  secret      = google_secret_manager_secret.am2n_notion_db_id.id
+  secret_data = var.am2n_notion_db_id
   depends_on = [
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,

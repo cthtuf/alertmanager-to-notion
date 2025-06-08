@@ -3,9 +3,10 @@ import typing as t
 import logging
 
 import google.cloud.logging
-from app import blueprints, event_handlers, exceptions
 from flask import Flask, Request, Response
 from python_settings import settings
+
+from app import blueprints, event_handlers, exceptions
 
 if t.TYPE_CHECKING:
     from google.cloud.functions_v1.context import Context

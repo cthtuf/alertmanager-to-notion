@@ -1,5 +1,5 @@
-from .check_site_for_update import CheckSiteForUpdate
+from .notion import NotionHandler
 
-__all__ = ("CheckSiteForUpdate",)
+__all__ = ("NotionHandler",)
 
-event_handlers = (CheckSiteForUpdate,)
+event_handlers = (NotionHandler,)

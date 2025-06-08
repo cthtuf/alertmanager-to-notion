@@ -1,7 +1,4 @@
 services:
-  firestore_emulator:
-    ports:
-      - 8200:8200
   app:
     volumes:
       - .:/app

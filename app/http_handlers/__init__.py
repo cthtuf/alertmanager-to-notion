@@ -1,3 +1,3 @@
-from .call_check_site_for_update import http_csfu_bp
+from .call_alertmanager_to_notion import http_am2n_bp
 
-blueprints = (http_csfu_bp,)
+blueprints = (http_am2n_bp,)
