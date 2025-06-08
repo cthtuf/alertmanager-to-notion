@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant User
+    participant HTTPHandler
+    participant PubSub
+    participant EventHandler
+    participant CheckSiteForUpdate
+    User ->> HTTPHandler: POST request /<site_url>
+    HTTPHandler ->> PubSub: Publish message
+    PubSub -->> EventHandler: Deliver message
+    EventHandler ->> CheckSiteForUpdate: Call to handle event

@@ -1,0 +1,45 @@
+ignore:
+  - "config/*"
+  - "docker/*"
+  - "tests/*"
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+      - type: patch
+        target: 95%
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+        base: auto
+        paths:
+          - "app"
+        branches:
+          - main
+        if_ci_failed: error #success, failure, error, ignore
+        informational: false
+        only_pulls: false
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+        base: auto
+        branches:
+          - main
+        if_ci_failed: error #success, failure, error, ignore
+        only_pulls: false
+        paths:
+          - "app"
+comment:
+  layout: "diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: false
+  hide_project_coverage: false

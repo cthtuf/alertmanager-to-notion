@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant CheckSiteForUpdate
+    participant Site
+    participant Firestore
+    participant WebhookReceiver
+    CheckSiteForUpdate ->> Site: Get new content
+    CheckSiteForUpdate ->> Firestore: Get last content
+    note over CheckSiteForUpdate: Check diff
+    alt Diff found
+        CheckSiteForUpdate ->> WebhookReceiver: Send webhook
+    end

@@ -1,0 +1,10 @@
+sequenceDiagram
+    participant GoogleCloudScheduler
+    participant PubSub
+    participant EventHandler
+    participant CheckSiteForUpdate
+    loop Hourly
+        GoogleCloudScheduler ->> PubSub: Publish message to topic
+        PubSub -->> EventHandler: Delivers message
+        EventHandler ->> CheckSiteForUpdate: Call to handle event
+    end

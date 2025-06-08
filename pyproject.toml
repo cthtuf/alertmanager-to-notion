@@ -1,0 +1,179 @@
+[tool.poetry]
+name = "google-cloud-function-gen2-template"
+version = "1.0.0"
+description = "Template for Python functions to run on Google Cloud Functions Platform (gen2), with CI\\CD by GitHub Actions"
+authors = ["Sergey Yarlov <gdazeysinc@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fireo = "^2.2.2"
+google-cloud-logging = "^3.11.2"
+python-decouple = "^3.8"
+tenacity = "^9.0.0"
+pytz = "^2024.2"
+python-settings = "^0.2.2"
+functions-framework = "^3.8.1"
+google-cloud-pubsub = "^2.26.1"
+dump-env = "^1.5.0"
+
+
+[tool.poetry.group.dev.dependencies]
+freezegun = "^1.5.1"
+pre-commit = "^3.8.0"
+pytest = "^8.3.2"
+mypy = "^1.11.2"
+isort = "^5.13.2"
+flake8 = "^7.1.1"
+flake8-isort = "^6.1.1"
+flake8-print = "^5.0.0"
+flake8-bugbear = "^24.8.19"
+flake8-builtins = "^2.5.0"
+flake8-debugger = "^4.1.2"
+flake8-string-format = "^0.3.0"
+flake8-docstrings = "^1.7.0"
+flake8-module-name = "^0.2.0"
+flake8-quotes = "^3.4.0"
+flake8-commas = "^4.0.0"
+pytest-cov = "^5.0.0"
+codecov = "^2.1.13"
+black = "^24.8.0"
+bandit = "^1.7.9"
+flake8-pyproject = "^1.2.3"
+pyupgrade = "^3.17.0"
+autoflake = "^2.3.1"
+xenon = "^0.9.1"
+pytest-deadfixtures = "^2.2.1"
+types-requests = "^2.32.0.20240914"
+types-pytz = "^2024.2.0.20241003"
+dump-env = "^1.5.0"
+codecov-cli = "^9.0.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+
+[tool.black]
+# https://github.com/psf/black
+target-version = ["py312"]
+line-length = 120
+color = true
+
+exclude = '''
+/(
+    \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | env
+    | venv
+    | .venv
+)/
+'''
+
+[tool.isort]
+# https://github.com/timothycrosley/isort/
+py_version = 312
+
+known_typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
+sections = ["FUTURE", "TYPING", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "MAIN", "LOCALFOLDER"]
+default_section = "FIRSTPARTY"
+known_main = ["server", "tests"]
+skip = ["__init__.py"]
+include_trailing_comma = true
+profile = "black"
+multi_line_output = 3
+indent = 4
+color_output = true
+
+
+[tool.autoflake]
+# return error code if changes are needed
+check = false
+# make changes to files instead of printing diffs
+in-place = true
+# drill down directories recursively
+recursive = true
+# exclude file/directory names that match these comma-separated globs
+exclude = ".venv,venv"
+# by default, only unused standard library imports are removed; specify a comma-separated list of additional
+# modules/packages
+#imports = "<IMPORTS>"
+# expand wildcard star imports with undefined names; this only triggers if there is only one star import in
+# the file; this is skipped if there are any uses of `__all__` or `del` in the file
+expand-star-imports = false
+# remove all unused imports (not just those from the standard library)
+remove-all-unused-imports = true
+# exclude __init__.py when removing unused imports
+ignore-init-module-imports = true
+# remove all duplicate keys in objects
+remove-duplicate-keys = true
+# remove unused variables
+remove-unused-variables = false
+# ignore all pass statements
+ignore-pass-statements = false
+# ignore pass statements after a newline ending on '"""'
+ignore-pass-after-docstring = true
+
+
+[tool.mypy]
+# https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
+python_version = 3.12
+pretty = true
+show_traceback = true
+color_output = true
+plugins = [
+  # "pydantic.mypy"
+]
+
+allow_redefinition = false
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+implicit_reexport = false
+no_implicit_optional = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
+strict_equality = true
+strict_optional = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_configs = true
+
+[tool.flake8]
+max-complexity = 6
+statistics = true
+max-line-length = 120
+doctests = true
+ignore = ["N999", "D100", "D104", "D106", "D401", "N999", "W503", "W504", "Q003", "B902", "P101", "P103", "N818",
+    "E203", "E731", "B017", "SIM114",
+]
+no-accept-encodings = true
+exclude = []
+# Flake plugins:
+accept-encodings = "utf-8"
+inline-quotes = "double"
+
+
+[tool.pytest.ini_options]
+addopts = "--strict --doctest-modules --cov=app --cov-report=xml --cov-report=html --junitxml=junit.xml -o junit_family=legacy --cov-fail-under=90 -p no:logging"
+norecursedirs = ["*.egg", ".eggs", "dist", "build", "docs", ".tox", ".git", "__pycache__", ".venv", "venv"]
+markers = [
+    "noautouse: mark a test to don't apply autouse fixtures which support noautouse mark",
+]

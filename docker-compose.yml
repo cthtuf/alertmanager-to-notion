@@ -1,0 +1,25 @@
+services:
+  firestore_emulator:
+    image: mtlynch/firestore-emulator
+    environment:
+      - FIRESTORE_PROJECT_ID=dummy-project-id
+      - PORT=8200
+    networks:
+      - webnet
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    environment:
+      - FIRESTORE_EMULATOR_HOST=firestore_emulator:8200
+      - GCP_PROJECT_ID=google-cloud-firestore-emulator
+      - SETTINGS_MODULE=app.settings
+      - CODECOV_TOKEN=${CODECOV_TOKEN}
+      - INSIDE_CI=${INSIDE_CI}
+    depends_on:
+      - firestore_emulator
+    networks:
+      - webnet
+
+networks:
+  webnet:
