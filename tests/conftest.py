@@ -8,5 +8,4 @@ It may be also used for extending doctest's context:
 
 pytest_plugins = [
     "tests.fixtures.common",
-    "tests.fixtures.website_content",
 ]
