@@ -11,33 +11,6 @@ def notion_service():
     return NotionService(token="token", db_id="dbid")
 
 
-@pytest.fixture
-def alert_payload():
-    """Fixture for a sample Alertmanager event payload."""
-    return {
-        "receiver": "webhook-site-receiver",
-        "status": "firing",
-        "alerts": [
-            {
-                "status": "firing",
-                "labels": {"alertname": "TestAlert", "instance": "host:123", "severity": "critical"},
-                "annotations": {"description": "desc", "summary": "sum"},
-                "startsAt": "2025-06-08T07:00:00Z",
-                "endsAt": "0001-01-01T00:00:00Z",
-                "generatorURL": "",
-                "fingerprint": "abc123",
-            },
-        ],
-        "groupLabels": {},
-        "commonLabels": {},
-        "commonAnnotations": {},
-        "externalURL": "http://localhost:9093",
-        "version": "4",
-        "groupKey": '{}:{alertname="TestAlert"}',
-        "truncatedAlerts": 0,
-    }
-
-
 @patch("requests.request")
 def test_notion_service_request_sends_correct_data(mock_request, notion_service):
     """Test that _request sends correct data to Notion API."""
