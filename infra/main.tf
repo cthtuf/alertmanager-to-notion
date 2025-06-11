@@ -292,7 +292,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
   service_config {
     available_memory      = "256M"
     service_account_email = google_service_account.alertmanager_to_notion_function_sa.email
-    ingress_settings      = "ALLOW_ALL" # Доступ открыт для всех, можно ограничить
+    ingress_settings      = "ALLOW_ALL"
     environment_variables = {
       GCP_PROJECT_ID   = var.project_id
       SETTINGS_MODULE  = "app.settings"

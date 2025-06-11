@@ -1,5 +1,8 @@
 import typing as t
 
+import base64
+import json
+
 from python_settings import settings
 
 from app.base import BaseHandler
@@ -21,9 +24,13 @@ class NotionHandler(BaseHandler):
 
     def __call__(self) -> None:
         """Execute handler."""
+        # Decode base64 and parse JSON
+        raw_data = self.event["data"]
+        decoded_data = base64.b64decode(raw_data).decode("utf-8")
+        data_dict = json.loads(decoded_data)
         notion = NotionService(
             token=self.notion_token,
             db_id=self.notion_db_id,
             notion_version=self.notion_version,
         )
-        notion.handle_alert(self.event)
+        notion.handle_alert(data_dict)
