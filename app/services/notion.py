@@ -126,7 +126,7 @@ class NotionService:
         properties = {
             "AMFingerprint": {"rich_text": [{"text": {"content": alert.fingerprint}}]},
             "AMStatus": {"select": {"name": alert.notion_status}},
-            # Add more fields as needed from alert
+            "AMEventDetails": {"rich_text": [{"text": {"content": alert.model_dump_json()}}]},
         }
         data = {
             "parent": {"database_id": self.db_id},

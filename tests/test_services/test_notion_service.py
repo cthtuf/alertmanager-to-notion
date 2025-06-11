@@ -141,6 +141,18 @@ def test_notion_service_create_page_from_alert(mock_request, notion_service):
             "properties": {
                 "AMFingerprint": {"rich_text": [{"text": {"content": "abc123"}}]},
                 "AMStatus": {"select": {"name": "Firing"}},
+                "AMEventDetails": {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": '{"status":"firing","labels":{"alertname":"a","instance":"i","severity":"s"'
+                                '},"annotations":{"description":"d","summary":"s"},"startsAt":'
+                                '"2025-06-08T07:00:00Z","endsAt":"0001-01-01T00:00:00Z","generatorURL":"",'
+                                '"fingerprint":"abc123","notion_status":"Firing"}',
+                            },
+                        },
+                    ],
+                },
             },
         },
     )
