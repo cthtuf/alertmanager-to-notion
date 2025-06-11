@@ -13,9 +13,9 @@ if t.TYPE_CHECKING:
 
 if settings.GCP_LOGGING:
     client = google.cloud.logging.Client()
-    client.setup_logging()
+    client.setup_logging(log_level=settings.LOG_LEVEL)
 else:
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=settings.LOG_LEVEL)
 
 logger = logging.getLogger("main")
 

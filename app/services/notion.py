@@ -14,27 +14,27 @@ logger = logging.getLogger("notion-service")
 class AlertLabels(BaseModel):
     """Labels for an alert, used to identify and categorize the alert."""
 
-    alertname: str | None
-    instance: str | None
-    severity: str | None
+    alertname: str | None = None
+    instance: str | None = None
+    severity: str | None = None
 
 
 class AlertAnnotations(BaseModel):
     """Annotations for an alert, providing additional information."""
 
-    description: str | None
-    summary: str | None
+    description: str | None = None
+    summary: str | None = None
 
 
 class Alert(BaseModel):
     """Represents an alert from Alertmanager."""
 
     status: str
-    labels: AlertLabels
-    annotations: AlertAnnotations
+    labels: AlertLabels | None = None
+    annotations: AlertAnnotations | None = None
     startsAt: str
     endsAt: str
-    generatorURL: str | None
+    generatorURL: str | None = None
     fingerprint: str
 
     @computed_field  # type: ignore
@@ -126,7 +126,7 @@ class NotionService:
         properties = {
             "AMFingerprint": {"rich_text": [{"text": {"content": alert.fingerprint}}]},
             "AMStatus": {"select": {"name": alert.notion_status}},
-            # Add more fields as needed from alert
+            "AMEventDetails": {"rich_text": [{"text": {"content": alert.model_dump_json()}}]},
         }
         data = {
             "parent": {"database_id": self.db_id},

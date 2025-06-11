@@ -75,8 +75,6 @@ To enable CI/CD pipelines, follow these steps:
     * **GCP_PROJECT_ID** – Your Google Cloud project ID.
     * **GCP_REGION** – The Google Cloud region where the functions will be deployed.
     * **GCP_SA_KEY** – Service Account key JSON (Get content for this secret from file `config/ghsa.json`).
-    * **NOTION_API_KEY** – Your Notion integration token.
-    * **NOTION_DATABASE_ID** – The ID of your Notion database for alerts.
 
 2.  For test coverage metrics:
     * Register your project on [Codecov](https://app.codecov.io/).
@@ -108,6 +106,44 @@ To enable CI/CD pipelines, follow these steps:
 7.  Create a Pull Request (PR) and check its status.
 8.  Merge the PR to the `main` branch.
 9.  Check the GitHub Actions tab for the CI/CD pipeline status to confirm deployment.
+10. Create an alert configuration for Prometheus Alertmanager:
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: alertmanager-webhook-secret
+      namespace: default
+    data:
+      notion-receiver-header-secret: auth-header-value-in-base64
+    type: Opaque
+    ---
+    apiVersion: monitoring.coreos.com/v1alpha1
+    kind: AlertmanagerConfig
+    metadata:
+      name: notion-incidents
+      namespace: default
+    spec:
+      receivers:
+      - name: 'notion-webhook-receiver'
+        webhookConfigs:
+        - url: https://your-gcf-url/alertmanager
+          sendResolved: true
+          httpConfig:
+            bearerTokenSecret:
+              name: alertmanager-webhook-secret
+              key: notion-receiver-header-secret
+      route:
+        groupBy:
+        - pod
+        groupInterval: 5m
+        groupWait: 30s
+        matchers:
+        - matchType: '=~'
+          name: severity
+          value: CRITICAL|ERROR
+        receiver: notion-webhook-receiver
+        repeatInterval: 1h
+    ```
 
 ---
 
