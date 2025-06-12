@@ -155,6 +155,31 @@ If you want to use your own Notion database, you need to have next mandatory fie
 
 ---
 
+## Shifts Support (Auto-Assignment)
+
+This project supports automatic assignment of incidents to the responsible person on shift, using a second Notion database (Shifts table). If you enable Shifts support, the service will:
+
+- When creating a new incident, search the Shifts database for a record where:
+  - The `Date` property matches today's date (UTC)
+  - The `Shift Type` property is set to `Daily` (Optional)
+- If such a record is found, the value of the `On-Duty` (Person(s)) field will be used to set the `Responsible` (Person(s)) field in the new incident record.
+
+### How to enable
+
+1. Set the following environment variables:
+   - `AM2N_SHIFTS_SUPPORT_ENABLED=true`
+   - `AM2N_SHIFTS_DB_ID=<your_shifts_database_id>`
+1. Make sure your Shifts database has the following fields:
+   - `Date` (Date)
+   - `Shift Type` (Select, with value `Daily`)
+   - `On-Duty` (Person)
+1. Your Incidents database must have the `Responsible` (Person) field.
+1. Ensure that the Notion integration has access to both the Incidents and Shifts databases.
+
+If Shifts support is disabled, incidents will be created without an assignee.
+
+---
+
 ## Contribution
 
 Community contributions are warmly welcomed! Please create pull requests or open issues to discuss suggestions and improvements.

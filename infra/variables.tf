@@ -17,7 +17,15 @@ variable "am2n_notion_token" {
   type = string
 }
 
-variable "am2n_notion_db_id" {
+variable "am2n_incidents_db_id" {
+  type = string
+}
+
+variable "am2n_shifts_db_id" {
+  type = string
+}
+
+variable "am2n_shifts_support_enabled" {
   type = string
 }
 

@@ -1,9 +1,13 @@
 import typing as t
 
 import logging
+from datetime import datetime
 
-import requests
+import httpx
+import pytz
+from notion_client import Client
 from pydantic import BaseModel, computed_field
+from python_settings import settings
 
 logger = logging.getLogger("notion-service")
 
@@ -60,94 +64,167 @@ class AlertmanagerEvent(BaseModel):
 
 
 # --- NotionService ---
+# Set it to empty value if you have only one shift type and don't need to filter by shift type.
+FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_NAME = "Shift Type"
+FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_VALUE = "Daily"
+SHIFT_RESPONSIBLE_ATTRIBUTE_NAME = "On-Duty"
+INCIDENT_RESPONSIBLE_ATTRIBUTE_NAME = "Responsible"
+INCIDENT_SHIFT_ATTRIBUTE_NAME = "Shift"
+FIND_FOR_CURRENT_SHIFT_TYPE_ENABLED = (
+    FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_NAME and FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_VALUE
+)
 
 
 class NotionService:
     """
-    Service for interacting with Notion API to manage pages based on Alertmanager events.
+    Service for interacting with Notion API to manage pages in an Incident Database based on Alertmanager events.
 
-    It looks at the fingerprint of alerts to find existing pages, updates their status.
-    Created to working with my ITSM Incidents Template, but can be adapted for other use cases.
+    Supports Shifts table for auto-assigning incidents.
     """
 
-    def __init__(self, token: str, db_id: str, notion_version: str = "2022-06-28"):
-        """Set Notion API token, database ID and API version."""
+    def __init__(
+        self,
+        token: str,
+        incidents_db_id: str,
+        shifts_db_id: str,
+        shifts_enabled: bool,
+        notion_version: str = "2022-06-28",
+    ):
+        """Initialize NotionService with required parameters."""
         self.token = token
-        self.db_id = db_id
+        self.incidents_db_id = incidents_db_id
+        self.shifts_db_id = shifts_db_id
+        self.shifts_enabled = shifts_enabled
         self.notion_version = notion_version
-        self.api_url = "https://api.notion.com/v1/pages"
+        self.client = Client(auth=token)
 
-    def _request(self, method: str, url: str, json: dict[str, t.Any]) -> requests.Response:
-        """Make a request to the Notion API with the given method and URL."""
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Notion-Version": self.notion_version,
-            "Content-Type": "application/json",
-        }
-        resp = requests.request(method, url, headers=headers, timeout=10, json=json)
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as e:
-            logger.error("Notion API error [%s %s]: %s, %s", method, url, resp.text, e)
-            raise
-        return resp
-
-    def find_page_by_fingerprint(self, fingerprint: str) -> str | None:
-        """Search for a Notion page by its fingerprint."""
-        search_url = f"https://api.notion.com/v1/databases/{self.db_id}/query"
-        data = {
-            "filter": {
+    def find_incident_page_by_fingerprint(self, fingerprint: str) -> str | None:
+        """Find a Notion page by its `AMFingerprint` value."""
+        resp = self.client.databases.query(
+            database_id=self.incidents_db_id,
+            filter={
                 "property": "AMFingerprint",
                 "rich_text": {"equals": fingerprint},
             },
-        }
-        resp = self._request("POST", search_url, json=data)
-        if results := resp.json().get("results", []):
-            logger.info("Fingerprint %s found in Notion, page ID: %s", fingerprint, results[0]["id"])
-            return results[0]["id"]
+        )
+        if incident_page := next(iter(resp.get("results", [])), None):  # type: ignore
+            logger.info("Fingerprint %s found in Notion, page ID: %s", fingerprint, incident_page["id"])
+            return incident_page["id"]
 
-        logger.info("Fingerprint %s not found in Notion", fingerprint)
+        logger.debug("Fingerprint %s not found in Notion, response=%s", fingerprint, resp)
+
         return None
 
-    def update_page_status(self, page_id: str, status: str) -> None:
-        """Update the status of a Notion page by its ID."""
-        url = f"https://api.notion.com/v1/pages/{page_id}"
-        data = {
-            "properties": {
-                "AMStatus": {"select": {"name": status}},
-            },
+    def update_incident_status(self, page_id: str, alert: Alert) -> None:
+        """Update the status of an incident."""
+        status = alert.notion_status
+        properties = {
+            "AMStatus": {"select": {"name": status}},
         }
-        self._request("PATCH", url, json=data)
+        if status == "Resolved":
+            properties["Incident Timeframe"] = {
+                "date": {
+                    "start": alert.startsAt,
+                    "end": alert.endsAt,
+                },
+            }
+        self.client.pages.update(
+            page_id=page_id,
+            properties=properties,
+        )
         logger.info(f"Updated Notion page {page_id} with status {status}")
 
-    def create_page_from_alert(self, alert: Alert) -> None:
-        """Create a new Notion page from an Alertmanager alert."""
-        url = self.api_url
-        properties = {
+    def _get_shift(self) -> tuple[int | None, list[dict[str, t.Any]]]:
+        """
+        Find a responsible person for today's daily shift in Shifts DB.
+
+        Returns a tuple of shift ID and list of responsible persons.
+        """
+        if not self.shifts_enabled:
+            logger.debug(
+                "Shifts support is not enabled or Shifts DB ID is not set: %s, %s",
+                settings.AM2N_SHIFTS_SUPPORT_ENABLED,
+                settings.AM2N_SHIFTS_DB_ID,
+            )
+            return None, []
+
+        today = datetime.now(tz=pytz.utc).date().isoformat()
+        # Prepare filter condition based on whether shift type filtering is enabled
+        filter_condition: dict[str, t.Any]
+        if FIND_FOR_CURRENT_SHIFT_TYPE_ENABLED:
+            filter_condition = {
+                "and": [
+                    {"property": "Date", "date": {"equals": today}},
+                    {
+                        "property": FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_NAME,
+                        "select": {"equals": FIND_FOR_CURRENT_SHIFT_TYPE_ATTRIBUTE_VALUE},
+                    },
+                ],
+            }
+        else:
+            filter_condition = {"property": "Date", "date": {"equals": today}}
+
+        # This query assumes that only one shift exist, according filter condition. At least it takes the first one.
+        try:
+            resp = self.client.databases.query(
+                database_id=self.shifts_db_id,
+                filter=filter_condition,
+                page_size=1,
+            )
+        except httpx.HTTPError:
+            logger.exception("Failed to query Notion shifts database: %s", self.shifts_db_id)
+            return None, []
+
+        if shift_page := next(iter(resp.get("results", [])), None):  # type: ignore
+            responsible = shift_page["properties"].get(SHIFT_RESPONSIBLE_ATTRIBUTE_NAME, {}).get("people", [])
+            logger.info("Found shift for today: %s, responsible: %s", shift_page["id"], responsible)
+
+            return shift_page["id"], responsible
+
+        logger.info("No shift_page found for today's shift")
+        return None, []
+
+    def create_incident_page_from_alert(self, alert: Alert) -> None:
+        """Create a new Notion page in the incidents database from an Alertmanager alert."""
+        properties: dict[str, t.Any] = {
+            "Name": {
+                "title": [
+                    {"text": {"content": "Incident (Created Automatically)"}},
+                ],
+            },
+            "Incident Timeframe": {
+                "date": {
+                    "start": alert.startsAt,
+                    "end": None,
+                },
+            },
             "AMFingerprint": {"rich_text": [{"text": {"content": alert.fingerprint}}]},
             "AMStatus": {"select": {"name": alert.notion_status}},
             "AMEventDetails": {"rich_text": [{"text": {"content": alert.model_dump_json()}}]},
         }
-        data = {
-            "parent": {"database_id": self.db_id},
-            "properties": properties,
-        }
-        self._request("POST", url, json=data)
-        logger.info(f"Created new Notion page for fingerprint {alert.fingerprint}")
+        # Assign responsible from Shifts if enabled
+        shift_page_id, shift_responsible = self._get_shift()
+        if shift_page_id:
+            properties[INCIDENT_SHIFT_ATTRIBUTE_NAME] = {"relation": [{"id": shift_page_id}]}
+            properties[INCIDENT_RESPONSIBLE_ATTRIBUTE_NAME] = {"people": shift_responsible}
+
+        self.client.pages.create(
+            parent={"database_id": self.incidents_db_id},
+            properties=properties,
+        )
+        logger.info("Created new Notion page for fingerprint: %s and properties: %s", alert.fingerprint, properties)
 
     def handle_alert(self, event: dict[str, t.Any]) -> None:
-        """Handle an Alertmanager event, processing alerts and updating Notion."""
+        """Handle an Alertmanager event and update Notion accordingly."""
         try:
             event_obj = AlertmanagerEvent.model_validate(event)
         except Exception as e:
             logger.exception("Failed to parse Alertmanager event: %s, error: %s", event, e)
             return
-
         for alert in event_obj.alerts:
             logger.info("Processing alert: %s", alert)
-            if notion_page_id := self.find_page_by_fingerprint(alert.fingerprint):
-                self.update_page_status(notion_page_id, alert.notion_status)
+            if notion_page_id := self.find_incident_page_by_fingerprint(alert.fingerprint):
+                self.update_incident_status(notion_page_id, alert)
             else:
-                self.create_page_from_alert(alert)
-
+                self.create_incident_page_from_alert(alert)
         logger.info("Finished processing Alertmanager event")

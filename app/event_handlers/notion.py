@@ -19,7 +19,9 @@ class NotionHandler(BaseHandler):
         """Init handler, set params."""
         self.event = event
         self.notion_token = settings.AM2N_NOTION_TOKEN
-        self.notion_db_id = settings.AM2N_NOTION_DB_ID
+        self.incidents_db_id = settings.AM2N_INCIDENTS_DB_ID
+        self.shifts_db_id = settings.AM2N_SHIFTS_DB_ID
+        self.shifts_enabled = settings.AM2N_SHIFTS_SUPPORT_ENABLED
         self.notion_version = "2022-06-28"
 
     def __call__(self) -> None:
@@ -30,7 +32,9 @@ class NotionHandler(BaseHandler):
         data_dict = json.loads(decoded_data)
         notion = NotionService(
             token=self.notion_token,
-            db_id=self.notion_db_id,
+            incidents_db_id=self.incidents_db_id,
+            shifts_db_id=self.shifts_db_id,
+            shifts_enabled=self.shifts_enabled,
             notion_version=self.notion_version,
         )
         notion.handle_alert(data_dict)
