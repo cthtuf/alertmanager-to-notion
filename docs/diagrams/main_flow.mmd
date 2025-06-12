@@ -2,5 +2,4 @@ graph TD
     A[Alertmanager] -->|Webhook POST Request| B(HTTP Cloud Function);
     B -->|Publish Message| C(Google Cloud Pub/Sub Topic);
     C -->|Trigger Event| D(Pub/Sub Cloud Function);
-    D -->|Notion API Calls| E[Notion Database Alerts];
-    E -- (Update/Create record with fingerprint) --> D;
+    D -->|Notion API Calls, Update/Create record with fingerprint| E[Notion Database];

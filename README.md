@@ -1,16 +1,16 @@
 # Alertmanager to Notion Integration (via Google Cloud Function Gen2)
 
-[![codecov](https://codecov.io/github/CthtufsPetProjects/alertmanager-to-notion/graph/badge.svg?token=KdHBsr2G7d)](https://codecov.io/github/CthtufsPetProjects/alertmanager-to-notion)
+[![codecov](https://codecov.io/github/cthtuf/alertmanager-to-notion/graph/badge.svg?token=KdHBsr2G7d)](https://codecov.io/github/cthtuf/alertmanager-to-notion)
 
 A solution for integrating Prometheus Alertmanager with Notion databases using Google Cloud Functions (Gen2). This project provides a robust structure for processing Alertmanager webhooks, publishing events to Google Cloud Pub/Sub, and handling those events to manage alert records in Notion.
 
 ## Description
 
-This project offers a streamlined approach to persist and manage Prometheus alerts within a Notion database. It leverages Google Cloud Functions Gen2 for event processing, ensuring scalability and cost-efficiency. The architecture is designed for clear separation of concerns: an HTTP-triggered function acts as a webhook receiver, and a Pub/Sub-triggered function processes the alert data for Notion interaction. If you don't need Google Cloud Function implementation, you can take the core logic class [NotionService](app/services/notion.py) to your own project.
+This project offers a streamlined approach to persisting and managing Prometheus alerts within a Notion database. It leverages Google Cloud Functions Gen2 for event processing, ensuring scalability and cost-efficiency. The architecture is designed for clear separation of concerns: an HTTP-triggered function acts as a webhook receiver, and a Pub/Sub-triggered function processes the alert data for Notion interaction. If you don't need the Google Cloud Function implementation, you can take the core logic class [NotionService](app/services/notion.py) for your own project.
 
 ### Why This Project Was Created
 
-I'm building an ITSM framework based on Notion, for startups and small companies, which includes an incident management subsystem. A key requirement was to automatically create incident records in a Notion database when incidents occurs in a Prometheus monitoring system. Also, it's critical to update these records in Notion automatically once an incident is resolved.
+[I'm building](https://www.notion.com/@cthtuf) an ITSM framework based on Notion for startups and small companies, which includes an incident management subsystem. A key requirement was to automatically create incident records in a Notion database when incidents occur in a Prometheus monitoring system. Also, it's critical to update these records in Notion automatically once an incident is resolved.
 
 This automation helps to:
 1. Log incidents instantly, saving time on manual entry.
@@ -18,9 +18,9 @@ This automation helps to:
 3. Speed up incident resolution with always-current information.
 4. Focus on fixing problems, not on administrative tasks.
 
-## Use Case Example
+## The flow
 
-This template is specifically adapted for the following use case:
+This template is specifically adapted for the following flow. Maybe it looks a bit complex, but it is designed to be robust and scalable. The flow consists of three main components:
 
 1.  **Alertmanager Webhook Reception (HTTP Request Handling):**
     * An **HTTP-triggered Google Cloud Function** acts as the endpoint for Prometheus Alertmanager webhooks.
@@ -35,6 +35,7 @@ This template is specifically adapted for the following use case:
         * It determines if an event with the specific `fingerprint` (unique identifier of the alert) already exists in the configured Notion database.
         * If an event with the `fingerprint` is found, it **updates the `Resolved` field (e.g., `true`/`false`)** for that Notion record.
         * If no existing record with the `fingerprint` is found, a **new entry (row) is created** in the Notion database.
+    * You can implement your own Event Handler; take a look at the [NotionService](app/services/notion.py) class and [BaseHandler](app/base.py) for an example.
 
 ---
 
@@ -86,7 +87,7 @@ To enable CI/CD pipelines, follow these steps:
 
 1.  Create a Notion integration and database:
     * [Create a Notion integration](https://www.notion.so/profile/integrations) and get your API key.
-    * [Duplicate Incident Management template](https://notion.so)
+    * [Duplicate my Notion Incident Management template](https://www.notion.com/templates/incidents-management) or create [your own database](#how-to-own-database).
     * Add the integration to your database with full access permissions. (Go to your database page, click "..." at the top right, select "Connections", and choose your integration.)
     * [Get the database ID](https://developers.notion.com/reference/retrieve-a-database).
 2.  Create a Google Cloud project and get your Project ID.
@@ -144,6 +145,13 @@ To enable CI/CD pipelines, follow these steps:
         receiver: notion-webhook-receiver
         repeatInterval: 1h
     ```
+
+<a id="how-to-own-database"></a>
+### With your own Notion database
+If you want to use your own Notion database, you need to have next mandatory fields in your Notion database:
+- `AMFingerprint` - a unique identifier for the alert (text field).
+- `AMStatus` - the status of the alert (select field with values: ["Firing", "Resolved"]).
+- `AMEventDetails` - JSON payload of the alert (text field).
 
 ---
 
