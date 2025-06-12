@@ -226,8 +226,22 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
     }
 
     secret_environment_variables {
-      key        = "AM2N_NOTION_DB_ID"
-      secret     = google_secret_manager_secret.am2n_notion_db_id.secret_id
+      key        = "AM2N_INCIDENTS_DB_ID"
+      secret     = google_secret_manager_secret.am2n_incidents_db_id.secret_id
+      version    = "latest"
+      project_id = var.project_id
+    }
+
+    secret_environment_variables {
+      key        = "AM2N_SHIFTS_DB_ID"
+      secret     = google_secret_manager_secret.am2n_shifts_db_id.secret_id
+      version    = "latest"
+      project_id = var.project_id
+    }
+
+    secret_environment_variables {
+      key        = "AM2N_SHIFTS_ENABLED"
+      secret     = google_secret_manager_secret.am2n_shifts_support_enabled.secret_id
       version    = "latest"
       project_id = var.project_id
     }
@@ -262,7 +276,9 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
     google_project_service.artifact_registry_api,
     google_project_service.secret_manager_api,
     google_secret_manager_secret.am2n_notion_token,
-    google_secret_manager_secret.am2n_notion_db_id,
+    google_secret_manager_secret.am2n_incidents_db_id,
+    google_secret_manager_secret.am2n_shifts_db_id,
+    google_secret_manager_secret.am2n_shifts_support_enabled,
     google_secret_manager_secret.am2n_http_header_name,
     google_secret_manager_secret.am2n_http_header_value,
     google_secret_manager_secret.events_pubsub_topic,
@@ -312,10 +328,24 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
       project_id = var.project_id
     }
 
+        secret_environment_variables {
+      key        = "AM2N_INCIDENTS_DB_ID"
+      secret     = google_secret_manager_secret.am2n_incidents_db_id.secret_id
+      version    = "latest"
+      project_id = var.project_id
+    }
+
     secret_environment_variables {
-      key    = "AM2N_NOTION_DB_ID"
-      secret = google_secret_manager_secret.am2n_notion_db_id.secret_id
-      version = "latest"
+      key        = "AM2N_SHIFTS_DB_ID"
+      secret     = google_secret_manager_secret.am2n_shifts_db_id.secret_id
+      version    = "latest"
+      project_id = var.project_id
+    }
+
+    secret_environment_variables {
+      key        = "AM2N_SHIFTS_ENABLED"
+      secret     = google_secret_manager_secret.am2n_shifts_support_enabled.secret_id
+      version    = "latest"
       project_id = var.project_id
     }
 
@@ -343,7 +373,9 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
     google_secret_manager_secret.am2n_http_header_name,
     google_secret_manager_secret.am2n_http_header_value,
     google_secret_manager_secret.am2n_notion_token,
-    google_secret_manager_secret.am2n_notion_db_id,
+    google_secret_manager_secret.am2n_incidents_db_id,
+    google_secret_manager_secret.am2n_shifts_db_id,
+    google_secret_manager_secret.am2n_shifts_support_enabled,
     google_secret_manager_secret.events_pubsub_topic,
     null_resource.wait_for_one_minute,
   ]
@@ -463,8 +495,8 @@ resource "google_secret_manager_secret_version" "am2n_notion_token_version" {
   ]
 }
 
-resource "google_secret_manager_secret" "am2n_notion_db_id" {
-  secret_id = "AM2N_NOTION_DB_ID"
+resource "google_secret_manager_secret" "am2n_incidents_db_id" {
+  secret_id = "AM2N_INCIDENTS_DB_ID"
   replication {
     user_managed {
       replicas {
@@ -477,9 +509,55 @@ resource "google_secret_manager_secret" "am2n_notion_db_id" {
     null_resource.wait_for_one_minute,
   ]
 }
-resource "google_secret_manager_secret_version" "am2n_notion_db_id_version" {
-  secret      = google_secret_manager_secret.am2n_notion_db_id.id
-  secret_data = var.am2n_notion_db_id
+resource "google_secret_manager_secret_version" "am2n_incidents_db_id_version" {
+  secret      = google_secret_manager_secret.am2n_incidents_db_id.id
+  secret_data = var.am2n_incidents_db_id
+  depends_on = [
+    google_project_service.secret_manager_api,
+    null_resource.wait_for_one_minute,
+  ]
+}
+
+resource "google_secret_manager_secret" "am2n_shifts_db_id" {
+  secret_id = "AM2N_SHIFTS_DB_ID"
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+  depends_on = [
+    google_project_service.secret_manager_api,
+    null_resource.wait_for_one_minute,
+  ]
+}
+resource "google_secret_manager_secret_version" "am2n_shifts_db_id_version" {
+  secret      = google_secret_manager_secret.am2n_shifts_db_id.id
+  secret_data = var.am2n_shifts_db_id
+  depends_on = [
+    google_project_service.secret_manager_api,
+    null_resource.wait_for_one_minute,
+  ]
+}
+
+resource "google_secret_manager_secret" "am2n_shifts_support_enabled" {
+  secret_id = "AM2N_SHIFTS_SUPPORT_ENABLED"
+  replication {
+    user_managed {
+      replicas {
+        location = var.region
+      }
+    }
+  }
+  depends_on = [
+    google_project_service.secret_manager_api,
+    null_resource.wait_for_one_minute,
+  ]
+}
+resource "google_secret_manager_secret_version" "am2n_shifts_support_enabled_version" {
+  secret      = google_secret_manager_secret.am2n_shifts_support_enabled.id
+  secret_data = var.am2n_shifts_support_enabled
   depends_on = [
     google_project_service.secret_manager_api,
     null_resource.wait_for_one_minute,

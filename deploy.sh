@@ -22,7 +22,9 @@ gcloud functions deploy $GCF_HTTP_FN \
   --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
   --set-secrets "EVENTS_PUBSUB_TOPIC=projects/${GCP_PROJECT_ID}/secrets/EVENTS_PUBSUB_TOPIC:latest,\
 AM2N_NOTION_TOKEN=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_TOKEN:latest,\
-AM2N_NOTION_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_DB_ID:latest,\
+AM2N_INCIDENTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_INCIDENTS_DB_ID:latest,\
+AM2N_SHIFTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_SHIFTS_DB_ID:latest,\
+AM2N_SHIFTS_SUPPORT_ENABLED=projects/${GCP_PROJECT_ID}/secrets/AM2N_SHIFTS_SUPPORT_ENABLED:latest,\
 AM2N_HTTP_HEADER_NAME=projects/${GCP_PROJECT_ID}/secrets/AM2N_HTTP_HEADER_NAME:latest,\
 AM2N_HTTP_HEADER_VALUE=projects/${GCP_PROJECT_ID}/secrets/AM2N_HTTP_HEADER_VALUE:latest"
 
@@ -37,6 +39,8 @@ gcloud functions deploy $GCF_EVENT_FN \
   --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
   --set-secrets "EVENTS_PUBSUB_TOPIC=projects/${GCP_PROJECT_ID}/secrets/EVENTS_PUBSUB_TOPIC:latest,\
 AM2N_NOTION_TOKEN=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_TOKEN:latest,\
-AM2N_NOTION_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_DB_ID:latest,\
+AM2N_INCIDENTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_INCIDENTS_DB_ID:latest,\
+AM2N_SHIFTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_SHIFTS_DB_ID:latest,\
+AM2N_SHIFTS_SUPPORT_ENABLED=projects/${GCP_PROJECT_ID}/secrets/AM2N_SHIFTS_SUPPORT_ENABLED:latest,\
 AM2N_HTTP_HEADER_NAME=projects/${GCP_PROJECT_ID}/secrets/AM2N_HTTP_HEADER_NAME:latest,\
 AM2N_HTTP_HEADER_VALUE=projects/${GCP_PROJECT_ID}/secrets/AM2N_HTTP_HEADER_VALUE:latest"
