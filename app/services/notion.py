@@ -141,7 +141,7 @@ class NotionService:
         Returns a tuple of shift ID and list of responsible persons.
         """
         if not self.shifts_enabled:
-            logger.debug(
+            logger.info(
                 "Shifts support is not enabled or Shifts DB ID is not set: %s, %s",
                 settings.AM2N_SHIFTS_SUPPORT_ENABLED,
                 settings.AM2N_SHIFTS_DB_ID,
@@ -163,7 +163,7 @@ class NotionService:
             }
         else:
             filter_condition = {"property": "Date", "date": {"equals": today}}
-
+        logger.debug("filter condition for shifts: %s", filter_condition)
         # This query assumes that only one shift exist, according filter condition. At least it takes the first one.
         try:
             resp = self.client.databases.query(
@@ -171,6 +171,7 @@ class NotionService:
                 filter=filter_condition,
                 page_size=1,
             )
+            logger.debug("Query response for shifts: %s", resp)
         except httpx.HTTPError:
             logger.exception("Failed to query Notion shifts database: %s", self.shifts_db_id)
             return None, []

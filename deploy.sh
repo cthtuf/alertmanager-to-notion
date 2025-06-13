@@ -11,6 +11,9 @@ GCF_EVENT_FN=alertmanager-to-notion-handler
 EVENTS_PUBSUB_TOPIC=alertmanager-events
 GCF_SA=alert-manager-to-notion@${GCP_PROJECT_ID}.iam.gserviceaccount.com
 
+# Set LOG_LEVEL from environment or default to INFO
+: "${LOG_LEVEL:=INFO}"
+
 # HTTP function (webhook)
 gcloud functions deploy $GCF_HTTP_FN \
   --trigger-http \
@@ -19,7 +22,7 @@ gcloud functions deploy $GCF_HTTP_FN \
   --gen2 --allow-unauthenticated \
   --region=${GCP_REGION} \
   --runtime=python312 --verbosity=debug \
-  --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
+  --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID},LOG_LEVEL=${LOG_LEVEL}" \
   --set-secrets "EVENTS_PUBSUB_TOPIC=projects/${GCP_PROJECT_ID}/secrets/EVENTS_PUBSUB_TOPIC:latest,\
 AM2N_NOTION_TOKEN=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_TOKEN:latest,\
 AM2N_INCIDENTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_INCIDENTS_DB_ID:latest,\
@@ -36,7 +39,7 @@ gcloud functions deploy $GCF_EVENT_FN \
   --gen2 \
   --region=${GCP_REGION} \
   --runtime=python312 --verbosity=debug \
-  --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
+  --set-env-vars="SETTINGS_MODULE=app.settings,GCP_PROJECT_ID=${GCP_PROJECT_ID},LOG_LEVEL=${LOG_LEVEL}" \
   --set-secrets "EVENTS_PUBSUB_TOPIC=projects/${GCP_PROJECT_ID}/secrets/EVENTS_PUBSUB_TOPIC:latest,\
 AM2N_NOTION_TOKEN=projects/${GCP_PROJECT_ID}/secrets/AM2N_NOTION_TOKEN:latest,\
 AM2N_INCIDENTS_DB_ID=projects/${GCP_PROJECT_ID}/secrets/AM2N_INCIDENTS_DB_ID:latest,\
