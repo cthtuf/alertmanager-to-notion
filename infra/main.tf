@@ -193,6 +193,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
     environment_variables = {
       GCP_PROJECT_ID = var.project_id
       SETTINGS_MODULE= "app.settings"
+      LOG_LEVEL      = var.log_level
     }
     source {
       storage_source {
@@ -208,6 +209,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
     environment_variables = {
       GCP_PROJECT_ID  = var.project_id
       SETTINGS_MODULE = "app.settings"
+      LOG_LEVEL       = var.log_level
     }
     ingress_settings = "ALLOW_INTERNAL_ONLY"
 
@@ -240,7 +242,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_handler" {
     }
 
     secret_environment_variables {
-      key        = "AM2N_SHIFTS_ENABLED"
+      key        = "AM2N_SHIFTS_SUPPORT_ENABLED"
       secret     = google_secret_manager_secret.am2n_shifts_support_enabled.secret_id
       version    = "latest"
       project_id = var.project_id
@@ -296,6 +298,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
     environment_variables = {
       GCP_PROJECT_ID  = var.project_id
       SETTINGS_MODULE = "app.settings"
+      LOG_LEVEL       = var.log_level
     }
     source {
       storage_source {
@@ -312,6 +315,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
     environment_variables = {
       GCP_PROJECT_ID   = var.project_id
       SETTINGS_MODULE  = "app.settings"
+      LOG_LEVEL        = var.log_level
     }
     # Adding secrets as environment variables
     secret_environment_variables {
@@ -343,7 +347,7 @@ resource "google_cloudfunctions2_function" "alertmanager_to_notion_webhook" {
     }
 
     secret_environment_variables {
-      key        = "AM2N_SHIFTS_ENABLED"
+      key        = "AM2N_SHIFTS_SUPPORT_ENABLED"
       secret     = google_secret_manager_secret.am2n_shifts_support_enabled.secret_id
       version    = "latest"
       project_id = var.project_id

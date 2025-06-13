@@ -41,3 +41,8 @@ variable "events_pubsub_topic" {
   type    = string
   default = "events-topic"
 }
+
+variable "log_level" {
+  type    = string
+  default = "INFO"
+}

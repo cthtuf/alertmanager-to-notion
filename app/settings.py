@@ -10,7 +10,7 @@ config = AutoConfig(search_path=BASE_DIR.joinpath("config"))
 
 # Common settings
 GCP_PROJECT_ID = config("GCP_PROJECT_ID")
-LOG_LEVEL = config("LOG_LEVEL", cast=logging.getLevelName, default=logging.INFO)
+LOG_LEVEL = config("LOG_LEVEL", cast=logging.getLevelName, default=logging.getLevelName(logging.INFO))
 
 # If not in Google Cloud, load local environment variables from .env
 if not (os.getenv("GAE_ENV") or os.getenv("K_SERVICE")):  # pragma: nocover
